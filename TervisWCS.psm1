@@ -10,13 +10,15 @@ FROM "qc"."ScaleLog"
 order by ts DESC 
 "@
 
-    $Results = Invoke-SQLODBC -DataSourceName tervis -SQLCommand $Query | 
-    ConvertFrom-DataRow
+    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
+    $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
+
+    $Results = Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow
 
     $ConveyorScaleNumberOfUniqueWeights = $Results | 
     Group-Object -Property Weight | 
-    measure | 
-    select -ExpandProperty count
+    Measure-Object | 
+    Select-Object -ExpandProperty Count
 
     $ConveyorScaleNumberOfUniqueWeights
 }
