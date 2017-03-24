@@ -131,11 +131,11 @@ function Add-LocalWCSPrinter {
     }
     process {
         if ($ComputerName) {
-            Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ComputerName $ComputerName
-            Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi" -ComputerName $ComputerName 
+            Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ComputerName $ComputerName -ErrorAction SilentlyContinue
+            Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi" -ComputerName $ComputerName -ErrorAction SilentlyContinue
         } else {
-            Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID 
-            Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi"
+            Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ErrorAction SilentlyContinue
+            Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi" -ErrorAction SilentlyContinue
         }
     }
 }
