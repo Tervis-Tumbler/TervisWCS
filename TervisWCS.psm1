@@ -161,3 +161,8 @@ function Remove-LocalWCSPrinter {
         }
     }
 }
+
+function Get-WCSDatabaseName {
+    $ConnectionString = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3718 | ConvertTo-SQLAnywhereConnectionString
+    Get-DatabaseNames -ConnectionString $ConnectionString
+}
