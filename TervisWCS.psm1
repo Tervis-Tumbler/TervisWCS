@@ -79,13 +79,43 @@ function Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate {
 
 function Install-WCSPrintersForBartenderCommander {
     param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    $Parameters = $PSBoundParameters
+
+    Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate @Parameters
+    Add-PrinterDriver -Name "ZDesigner 110Xi4 203 dpi" @Parameters    
+
+    if (-not (Test-WCSPrintersForBartenderCommanderInstalled @Parameters)) {
+        Get-WCSEquipmentBottomLabelPrintEngine |
+        Add-LocalWCSPrinter @Parameters
+    }
+
+    if (-not (Test-WCSPrintersForBartenderCommanderInstalled @Parameters)) {
+        Throw "Couldn't install some printers or ports. To identify the missing  run Test-WCSPrintersForBartenderCommanderInstalled -verbose $ComputerName"
+    }
+}
+
+function Test-WCSPrintersForBartenderCommanderInstalled {
+    [CMDLetBinding()]
+    param (
         $ComputerName
     )
-    Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate @PSBoundParameters
-    Add-PrinterDriver -Name "ZDesigner 110Xi4 203 dpi" @PSBoundParameters
-    
-    Get-WCSEquipmentBottomLabelPrintEngine |
-    Add-LocalWCSPrinter @PSBoundParameters
+    $Parameters = $PSBoundParameters
+
+    $Equipment = Get-WCSEquipmentBottomLabelPrintEngine
+    $PrinterPorts = Get-PrinterPort @Parameters
+    $Printers = Get-Printer @Parameters
+
+    $MissingPorts = Compare-Object -ReferenceObject ($Equipment.HostID | sort -Unique) -DifferenceObject $PrinterPorts.Name | 
+    where SideIndicator -EQ "<="
+    $MissingPorts | Write-VerboseAdvanced -Verbose:($VerbosePreference -ne "SilentlyContinue")
+
+    $MissingPrinters = Compare-Object -ReferenceObject $Equipment.ID -DifferenceObject $Printers.Name | 
+    where SideIndicator -EQ "<="
+    $MissingPrinters | Write-VerboseAdvanced -Verbose:($VerbosePreference -ne "SilentlyContinue")
+
+    -not $MissingPorts -or -not $MissingPrinters
 }
 
 function Add-LocalWCSPrinter {
