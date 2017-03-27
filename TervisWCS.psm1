@@ -23,25 +23,59 @@ order by ts DESC
     $ConveyorScaleNumberOfUniqueWeights
 }
 
-function Add-TervisWCSDSN {
-    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
-    $DatabaseName = $SybaseDatabaseEntryDetails.DatabaseName
+$WCSDSNTemplate = [PSCustomObject][Ordered]@{
+    Name = "Tervis"
+    PasswordID = 3459
+},
+[PSCustomObject][Ordered]@{
+    Name = "tervisBartender"
+    PasswordID = 3718
+}
 
-    $PropertyValue = @"
+function Get-WCSODBCDSNTemplate {
+    param (
+        $Name
+    )
+    $WCSDSNTemplate | where Name -EQ $Name
+}
+
+function Add-WCSODBCDSN {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet("Tervis","tervisBartender")]
+        $ODBCDSNTemplateName,
+
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    begin {
+        $ODBCDSNTemplate = Get-WCSODBCDSNTemplate -Name $ODBCDSNTemplateName
+
+        $DSNName = $ODBCDSNTemplate.Name
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $ODBCDSNTemplate.PasswordID
+        $DatabaseName = $SybaseDatabaseEntryDetails.DatabaseName
+
+        $PropertyValue = @"
 ServerName=$($SybaseDatabaseEntryDetails.ServerName)
 Integrated=NO
 Host=$($SybaseDatabaseEntryDetails.Host)
 DatabaseName=$DatabaseName
 "@ -split "`r`n"
+    }
 
-    Add-OdbcDsn -Name Tervis -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform 32-bit -DsnType System
-    New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DatabaseName -PropertyType String -Name UID -Value $Credential.UserName
-    New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DatabaseName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
+    process {
+        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName
+        Invoke-Command @ComputerNameParameter -ScriptBlock {
+            Add-OdbcDsn -Name $DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform 32-bit -DsnType System
+            New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DSNName -PropertyType String -Name UID -Value $Credential.UserName
+            New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DSNName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
 
-    Add-OdbcDsn -Name Tervis -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform '64-bit' -DsnType System
-    New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DatabaseName -PropertyType String -Name UID -Value $Credential.UserName
-    New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DatabaseName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
+            Add-OdbcDsn -Name $DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform '64-bit' -DsnType System
+            New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DSNName -PropertyType String -Name UID -Value $Credential.UserName
+            New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DSNName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
+        }
+    }
 }
+
 
 function Get-WCSEquipment {
     $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
