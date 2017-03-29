@@ -62,17 +62,28 @@ DatabaseName=$DatabaseName
 "@ -split "`r`n"
     }
 
-    process {
-        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName
-        Invoke-Command @ComputerNameParameter -ScriptBlock {
-            Add-OdbcDsn -Name $DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform 32-bit -DsnType System
-            New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DSNName -PropertyType String -Name UID -Value $Credential.UserName
-            New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$DSNName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
-
-            Add-OdbcDsn -Name $DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $PropertyValue -Platform '64-bit' -DsnType System
-            New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DSNName -PropertyType String -Name UID -Value $Credential.UserName
-            New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$DSNName -PropertyType String -Name PWD -Value $Credential.GetNetworkCredential().password
+    process { 
+        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName | ConvertTo-HashTable
+        $CIMSession = New-CimSession @ComputerNameParameter
+       
+        $ODBCDSN32Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '32-bit' -Name $DSNName -ErrorAction SilentlyContinue
+        if (-not $ODBCDSN32Bit) {
+            Invoke-Command @ComputerNameParameter -ScriptBlock {
+                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform 32-bit -DsnType System
+                New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name UID -Value $Using:SybaseDatabaseEntryDetails.UserName | Out-Null
+                New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name PWD -Value $Using:SybaseDatabaseEntryDetails.Password | Out-Null
+            }
         }
+
+        $ODBCDSN64Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '64-bit' -Name $DSNName -ErrorAction SilentlyContinue
+        if (-not $ODBCDSN64Bit) {
+            Invoke-Command @ComputerNameParameter -ScriptBlock {
+                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform '64-bit' -DsnType System
+                New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name UID -Value $Using:SybaseDatabaseEntryDetails.UserName | Out-Null
+                New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name PWD -Value $Using:SybaseDatabaseEntryDetails.Password | Out-Null
+            }
+        }
+        $CIMSession | Remove-CimSession
     }
 }
 
