@@ -218,8 +218,13 @@ function Invoke-TervisShippingComputersFlushDNS {
 
     Start-ParallelWork -Parameters $ShippingPCs.Name -ScriptBlock {
         param ($parameter)
-        Invoke-Command -ComputerName $parameter -ScriptBlock {
-            ipconfig /flushdns        
+        $ConnectionStatus = Test-NetConnection -ComputerName $parameter -CommonTCPPort WINRM -WarningAction SilentlyContinue
+        if ($ConnectionStatus.TcpTestSucceeded) {
+            Invoke-Command -ComputerName $parameter -ScriptBlock {
+                ipconfig /flushdns
+            }       
+        } else {
+            Write-Warning "Could not connect to $parameter"
         }
     }
 }
