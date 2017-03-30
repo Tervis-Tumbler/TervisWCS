@@ -211,3 +211,15 @@ function Get-WCSDatabaseName {
     $ConnectionString = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3718 | ConvertTo-SQLAnywhereConnectionString
     Get-DatabaseNames -ConnectionString $ConnectionString
 }
+
+function Invoke-TervisShippingComputersFlushDNS {
+    param()
+    $ShippingPCs = Get-ADComputer -Filter {Name -like "SHIP*PC"}
+
+    Start-ParallelWork -Parameters $ShippingPCs.Name -ScriptBlock {
+        param ($parameter)
+        Invoke-Command -ComputerName $parameter -ScriptBlock {
+            ipconfig /flushdns        
+        }
+    }
+}
