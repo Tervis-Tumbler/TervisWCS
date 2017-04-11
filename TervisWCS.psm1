@@ -87,7 +87,6 @@ DatabaseName=$DatabaseName
     }
 }
 
-
 function Get-WCSEquipment {
     $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
     $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
@@ -302,3 +301,21 @@ function Add-PathToEnvironmentVariablePath {
         }
     }
 }
+
+function Invoke-TervisShippingComputersFlushDNS {
+    param()
+    $ShippingPCs = Get-ADComputer -Filter {Name -like "SHIP*PC"}
+
+    Start-ParallelWork -Parameters $ShippingPCs.Name -ScriptBlock {
+        param ($parameter)
+        $ConnectionStatus = Test-NetConnection -ComputerName $parameter -CommonTCPPort WINRM -WarningAction SilentlyContinue
+        if ($ConnectionStatus.TcpTestSucceeded) {
+            Invoke-Command -ComputerName $parameter -ScriptBlock {
+                ipconfig /flushdns
+            }       
+        } else {
+            Write-Warning "Could not connect to $parameter"
+        }
+    }
+}
+
