@@ -211,3 +211,94 @@ function Get-WCSDatabaseName {
     $ConnectionString = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3718 | ConvertTo-SQLAnywhereConnectionString
     Get-DatabaseNames -ConnectionString $ConnectionString
 }
+
+function Invoke-WCSJavaApplicationProvision {
+    param (
+        $EnvironmentName
+    )
+    Invoke-ClusterApplicationProvision -ClusterApplicationName WCSJavaApplication -EnvironmentName $EnvironmentName
+    $Nodes = Get-TervisClusterApplicationNode -ClusterApplicationName WCSJavaApplication -EnvironmentName $EnvironmentName
+    $Nodes | Add-WCSODBCDSN -ODBCDSNTemplateName Tervis
+    $Nodes | Set-WCSEnvironmentVariables
+}
+
+function Get-WCSJavaApplicationRootDirectory {
+    "C:\QcSoftware"
+}
+
+function Set-WCSEnvironmentVariables {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    begin {
+        $WCSJavaApplicationRootDirectory = Get-WCSJavaApplicationRootDirectory
+
+        $EnvironmentVariables = [PSCustomObject]@{
+            Name = "CONFIG_DIR"
+            Value = "$WCSJavaApplicationRootDirectory\config"
+        },
+        [PSCustomObject]@{
+            Name = "JSWAT"
+            Value = "$WCSJavaApplicationRootDirectory\jswat"
+        },
+        [PSCustomObject]@{
+            Name = "JSWAT_HOME"
+            Value = "$WCSJavaApplicationRootDirectory\jswat"
+        },
+        [PSCustomObject]@{
+            Name = "PROJECT_BASE"
+            Value = "$WCSJavaApplicationRootDirectory"
+        }
+
+        $PathsToAddToEnvironmentVariablePath = @(
+            "$WCSJavaApplicationRootDirectory\lib",
+            "$WCSJavaApplicationRootDirectory\Bin"
+        )
+    }
+    process {
+        $EnvironmentVariablesResult = $EnvironmentVariables | 
+            Set-EnvironmentVariable -ComputerName $ComputerName -Target Machine -ReturnTrueIfSet
+        $PathsResult = $PathsToAddToEnvironmentVariablePath | 
+            Add-PathToEnvironmentVariablePath -ComputerName $ComputerName -Target Machine -ReturnTrueIfSet
+        if ($EnvironmentVariablesResult -or $PathsResult) {
+            Restart-Computer -ComputerName $ComputerName
+            Wait-ForNodeRestart -ComputerName $ComputerName
+        }
+    }
+}
+
+function Set-EnvironmentVariable {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Name,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$Value,
+        [Parameter(Mandatory)][ValidateSet("Machine","Process","User")]$Target,
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Switch]$Force,
+        [Switch]$ReturnTrueIfSet
+    )
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            if ( -not (Get-Item -Path Env:\$Using:Name -ErrorAction SilentlyContinue) -or $Using:Force) {
+                [Environment]::SetEnvironmentVariable($Using:Name, $Using:Value, $Using:Target)
+                if ($Using:ReturnTrueIfSet) { $true }
+            }
+        }
+    }
+}
+
+function Add-PathToEnvironmentVariablePath {
+    param (
+        [Parameter(Mandatory,ValueFromPipeline)]$Path,
+        [Parameter(Mandatory)][ValidateSet("Machine","Process","User")]$Target,
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Switch]$ReturnTrueIfSet
+    )
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {            
+            if ( -not ($env:Path -split ";" -contains $Using:Path)) {
+                [Environment]::SetEnvironmentVariable("PATH", "$env:Path;$Using:Path", $Using:Target)
+                if ($Using:ReturnTrueIfSet) { $true }
+            }
+        }
+    }
+}
