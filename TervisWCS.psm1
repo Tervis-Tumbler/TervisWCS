@@ -319,3 +319,17 @@ function Invoke-TervisShippingComputersFlushDNS {
     }
 }
 
+function Expand-QCSoftwareZipPackage {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory)]$ZipFileLocation
+    )
+    begin {
+        $ExtractPath = Get-WCSJavaApplicationRootDirectory
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            Expand-Archive -Path $Using:ZipFileLocation -DestinationPath $Using:ExtractPath -Force
+        }
+    }
+}
