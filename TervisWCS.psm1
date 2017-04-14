@@ -219,6 +219,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes = Get-TervisClusterApplicationNode -ClusterApplicationName WCSJavaApplication -EnvironmentName $EnvironmentName
     $Nodes | Add-WCSODBCDSN -ODBCDSNTemplateName Tervis
     $Nodes | Set-WCSEnvironmentVariables
+    $Nodes | Expand-QCSoftwareZipPackage
 }
 
 function Get-WCSJavaApplicationRootDirectory {
@@ -321,15 +322,26 @@ function Invoke-TervisShippingComputersFlushDNS {
 
 function Expand-QCSoftwareZipPackage {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
-        [Parameter(Mandatory)]$ZipFileLocation
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName        
     )
     begin {
-        $ExtractPath = Get-WCSJavaApplicationRootDirectory
+        $ADDomain = Get-ADDomain -Current LocalComputer
+        $ZipFileName = "QcSoftware.zip"
+        $ZipFilePathRemote = "\\$($ADDomain.DNSRoot)\applications\GitRepository\WCSJavaApplication\$ZipFileName"
+        $ZipFileCopyPathLocal = "C:\ProgramData\TervisWCS\"
+        $ExtractPath = Get-WCSJavaApplicationRootDirectory        
     }
     process {
+        $ZipFileCopyPathRemote = $ZipFileCopyPathLocal | ConvertTo-RemotePath -ComputerName $ComputerName        
+        New-Item -Force -ItemType Directory -Path $ZipFileCopyPathRemote | Out-Null
+        if (-not (Test-Path $ZipFileCopyPathRemote\$ZipFileName)) {
+            Copy-Item -Path $ZipFilePathRemote -Destination $ZipFileCopyPathRemote
+        }
+        
         Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-            Expand-Archive -Path $Using:ZipFileLocation -DestinationPath $Using:ExtractPath -Force
+            if (-not (Test-Path $Using:ExtractPath)) {
+                Expand-Archive -Path "$Using:ZipFileCopyPathLocal\$Using:ZipFileName" -DestinationPath $Using:ExtractPath -Force
+            }
         }
     }
 }
