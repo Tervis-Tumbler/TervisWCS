@@ -277,10 +277,17 @@ function Set-EnvironmentVariable {
         [Switch]$ReturnTrueIfSet
     )
     process {
-        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-            if ( -not (Get-Item -Path Env:\$Using:Name -ErrorAction SilentlyContinue) -or $Using:Force) {
-                [Environment]::SetEnvironmentVariable($Using:Name, $Using:Value, $Using:Target)
-                if ($Using:ReturnTrueIfSet) { $true }
+        if ($ComputerName) {
+            Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+                if ( -not (Get-Item -Path Env:\$Using:Name -ErrorAction SilentlyContinue) -or $Using:Force) {
+                    [Environment]::SetEnvironmentVariable($Using:Name, $Using:Value, $Using:Target)
+                    if ($Using:ReturnTrueIfSet) { $true }
+                }
+            }
+        } else {
+            if ( -not (Get-Item -Path Env:\$Name -ErrorAction SilentlyContinue) -or $Force) {
+                [Environment]::SetEnvironmentVariable($Name, $Value, $Target)
+                if ($ReturnTrueIfSet) { $true }
             }
         }
     }
@@ -332,7 +339,7 @@ function Expand-QCSoftwareZipPackage {
         $ExtractPath = Get-WCSJavaApplicationRootDirectory        
     }
     process {
-        $ZipFileCopyPathRemote = $ZipFileCopyPathLocal | ConvertTo-RemotePath -ComputerName $ComputerName        
+        $ZipFileCopyPathRemote = $ZipFileCopyPathLocal | ConvertTo-RemotePath -ComputerName $ComputerName
         New-Item -Force -ItemType Directory -Path $ZipFileCopyPathRemote | Out-Null
         if (-not (Test-Path $ZipFileCopyPathRemote\$ZipFileName)) {
             Copy-Item -Path $ZipFilePathRemote -Destination $ZipFileCopyPathRemote
@@ -343,5 +350,60 @@ function Expand-QCSoftwareZipPackage {
                 Expand-Archive -Path "$Using:ZipFileCopyPathLocal\$Using:ZipFileName" -DestinationPath $Using:ExtractPath -Force
             }
         }
+    }
+}
+
+function Install-WCSServiceManager {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName        
+    )
+    begin {
+        $RootDirectory = Get-WCSJavaApplicationRootDirectory
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            Set-Location -Path $Using:RootDirectory\bin
+            cmd /c "..\profile.bat && servicemgr -i"
+        }
+    }
+}
+
+function Set-WCSProfileBat {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName        
+    )
+    begin {
+        $RootDirectory = Get-WCSJavaApplicationRootDirectory
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
+        $Global:DATABASE_MACHINE = $SybaseDatabaseEntryDetails.Host
+        $Global:DATABASE_NAME = $SybaseDatabaseEntryDetails.DatabaseName
+        $Global:QCCS_DB_NAME = $SybaseDatabaseEntryDetails.DatabaseName
+        $Global:DATABASE_PORT = $SybaseDatabaseEntryDetails.Port
+        $ADDomain = Get-ADDomain -Current LocalComputer
+        $ProfileTemplateFile = "\\$($ADDomain.DNSRoot)\applications\GitRepository\WCSJavaApplication\Profile.bat.pstemplate"
+    }
+    process {
+        $RootDirectoryRemote = $RootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
+
+        $ProfileTemplateFile | 
+        Invoke-ProcessTemplateFile |
+        Out-File -Encoding utf8 -NoNewline "$RootDirectoryRemote\profile.bat"
+    }
+}
+
+function ConvertFrom-StringUsingRegexCaptureGroup {
+    param (
+        [Regex]$Regex,
+        [Parameter(ValueFromPipeline)]$Content
+    )
+    process {
+        $Match = $Regex.Match($Content)
+        $Object = [pscustomobject]@{} 
+        
+        foreach ($GroupName in $Regex.GetGroupNames() | select -Skip 1) {
+            $Object | 
+            Add-Member -MemberType NoteProperty -Name $GroupName -Value $Match.Groups[$GroupName].Value 
+        }
+        $Object
     }
 }
