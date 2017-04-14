@@ -220,6 +220,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Add-WCSODBCDSN -ODBCDSNTemplateName Tervis
     $Nodes | Set-WCSEnvironmentVariables
     $Nodes | Expand-QCSoftwareZipPackage
+    $Nodes | Set-WCSProfileBat
 }
 
 function Get-WCSJavaApplicationRootDirectory {
@@ -370,7 +371,7 @@ function Install-WCSServiceManager {
 
 function Set-WCSProfileBat {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName        
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
     )
     begin {
         $RootDirectory = Get-WCSJavaApplicationRootDirectory
@@ -384,6 +385,7 @@ function Set-WCSProfileBat {
     }
     process {
         $RootDirectoryRemote = $RootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
+        $Global:ComputerName = $ComputerName
 
         $ProfileTemplateFile | 
         Invoke-ProcessTemplateFile |
