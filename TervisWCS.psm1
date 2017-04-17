@@ -23,13 +23,39 @@ order by ts DESC
     $ConveyorScaleNumberOfUniqueWeights
 }
 
+$EnvironmentState = [PSCustomObject][Ordered]@{
+    EnvironmentName = "Production"
+    SybaseTervisUserPasswordEntryID = 3458
+    SybaseQCUserPasswordEntryID = 3459
+    SybaseBartenderUserPasswordEntryID = 3718
+},
+[PSCustomObject][Ordered]@{
+    EnvironmentName = "Epsilon"
+    SybaseTervisUserPasswordEntryID = 3457
+    SybaseQCUserPasswordEntryID = 4116
+    SybaseBartenderUserPasswordEntryID = 4118
+},
+[PSCustomObject][Ordered]@{
+    EnvironmentName = "Delta"
+    SybaseTervisUserPasswordEntryID = 3456
+    SybaseQCUserPasswordEntryID = 4115
+    SybaseBartenderUserPasswordEntryID = 4117
+}
+
+function Get-WCSEnvironmentState {
+    param (
+        [Parameter(Mandatory)]$EnvironmentName
+    )
+    $Script:EnvironmentState | where EnvironmentName -eq $EnvironmentName
+}
+
 $WCSDSNTemplate = [PSCustomObject][Ordered]@{
     Name = "Tervis"
-    PasswordID = 3459
+    EnvironmentStatePropertyContainingPasswordID = "SybaseTervisUserPasswordEntryID"
 },
 [PSCustomObject][Ordered]@{
     Name = "tervisBartender"
-    PasswordID = 3718
+    EnvironmentStatePropertyContainingPasswordID = "SybaseBartenderUserPasswordEntryID"
 }
 
 function Get-WCSODBCDSNTemplate {
@@ -45,13 +71,15 @@ function Add-WCSODBCDSN {
         [ValidateSet("Tervis","tervisBartender")]
         $ODBCDSNTemplateName,
 
-        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
     )
     begin {
         $ODBCDSNTemplate = Get-WCSODBCDSNTemplate -Name $ODBCDSNTemplateName
-
         $DSNName = $ODBCDSNTemplate.Name
-        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $ODBCDSNTemplate.PasswordID
+        $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
+
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.$($ODBCDSNTemplate.EnvironmentStatePropertyContainingPasswordID)
         $DatabaseName = $SybaseDatabaseEntryDetails.DatabaseName
 
         $PropertyValue = @"
@@ -69,7 +97,7 @@ DatabaseName=$DatabaseName
         $ODBCDSN32Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '32-bit' -Name $DSNName -ErrorAction SilentlyContinue
         if (-not $ODBCDSN32Bit) {
             Invoke-Command @ComputerNameParameter -ScriptBlock {
-                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform 32-bit -DsnType System
+                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform '32-bit' -DsnType System
                 New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name UID -Value $Using:SybaseDatabaseEntryDetails.UserName | Out-Null
                 New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name PWD -Value $Using:SybaseDatabaseEntryDetails.Password | Out-Null
             }
@@ -84,6 +112,39 @@ DatabaseName=$DatabaseName
             }
         }
         $CIMSession | Remove-CimSession
+    }
+}
+
+function Remove-WCSODBCDSN {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet("Tervis","tervisBartender")]
+        $ODBCDSNTemplateName,
+
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    begin {
+        $DSNName = $ODBCDSNTemplateName
+    }
+    process {
+        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName | ConvertTo-HashTable
+        $CIMSession = New-CimSession @ComputerNameParameter       
+        Remove-OdbcDsn -Name tervis -Platform All -CimSession $CIMSession -DsnType All -ErrorAction SilentlyContinue
+    }
+}
+
+function Update-WCSODBCDSN {
+    param (
+        [Parameter(Mandatory)]
+        [ValidateSet("Tervis","tervisBartender")]
+        $ODBCDSNTemplateName,
+
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+    )
+    process {
+        Remove-WCSODBCDSN -ODBCDSNTemplateName $ODBCDSNTemplateName -ComputerName $ComputerName
+        Add-WCSODBCDSN -ODBCDSNTemplateName $ODBCDSNTemplateName -ComputerName $ComputerName -EnvironmentName $EnvironmentName
     }
 }
 
@@ -223,6 +284,41 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Set-WCSProfileBat
     $Nodes | New-QCSoftwareShare
     $Nodes | Install-WCSServiceManager
+    $Nodes | New-WCSShortcut
+    $Nodes | Set-WCSBackground
+}
+
+function Get-WCSJavaApplicationGitRepositoryPath {
+    $ADDomain = Get-ADDomain -Current LocalComputer
+    "\\$($ADDomain.DNSRoot)\applications\GitRepository\WCSJavaApplication"
+}
+
+function Set-WCSBackground {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName
+    )
+    begin {
+        $BackGroundSourcePath = "$(Get-WCSJavaApplicationGitRepositoryPath)\Background"
+        $BackGroundPathLocal = "$(Get-WCSJavaApplicationRootDirectory)\Gif"
+    }
+    process {
+        $BackGroundPathRemote = $BackGroundPathLocal | ConvertTo-RemotePath -ComputerName $ComputerName
+        Copy-Item -Force -Path "$BackGroundSourcePath\backgroundQC.$EnvironmentName.png" -Destination $BackGroundPathRemote\backgroundQC.png
+    }
+}
+
+function New-WCSShortcut {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    begin {
+        $WCSJavaApplicationRootDirectory = Get-WCSJavaApplicationRootDirectory
+    }
+    process {
+        $WCSShortcutPath = $WCSJavaApplicationRootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
+        Set-Shortcut -LinkPath "$WCSShortcutPath\WCS ($ComputerName).lnk" -IconLocation "\\$ComputerName\QcSoftware\Gif\tfIcon.ico,0" -TargetPath "\\$ComputerName\QcSoftware\Bin\runScreens.cmd" -Arguments "-q -p \\$ComputerName\QcSoftware -n %COMPUTERNAME%"
+    }
 }
 
 function New-QCSoftwareShare {
@@ -391,6 +487,21 @@ function Install-WCSServiceManager {
     }
 }
 
+function Remove-WCSServiceManager {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName        
+    )
+    begin {
+        $RootDirectory = Get-WCSJavaApplicationRootDirectory
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            Set-Location -Path $Using:RootDirectory\bin
+            cmd /c "..\profile.bat && servicemgr -r"
+        }
+    }
+}
+
 function Set-WCSProfileBat {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
@@ -411,7 +522,7 @@ function Set-WCSProfileBat {
 
         $ProfileTemplateFile | 
         Invoke-ProcessTemplateFile |
-        Out-File -Encoding utf8 -NoNewline "$RootDirectoryRemote\profile.bat"
+        Out-File -Encoding ascii -NoNewline "$RootDirectoryRemote\profile.bat"
     }
 }
 
