@@ -221,6 +221,28 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Set-WCSEnvironmentVariables
     $Nodes | Expand-QCSoftwareZipPackage
     $Nodes | Set-WCSProfileBat
+    $Nodes | New-QCSoftwareShare
+    $Nodes | Install-WCSServiceManager
+}
+
+function New-QCSoftwareShare {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    begin {
+        $WCSJavaApplicationRootDirectory = Get-WCSJavaApplicationRootDirectory
+    }
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            if (-not (Get-SmbShare -Name QcSoftware -ErrorAction SilentlyContinue)) {
+                New-SmbShare -Name QcSoftware -Path $Using:WCSJavaApplicationRootDirectory -ChangeAccess "Everyone" | Out-Null
+                $ACL = Get-Acl -Path $Using:WCSJavaApplicationRootDirectory
+                $AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "Modify","ContainerInherit,ObjectInherit", "None", "Allow")
+                $ACL.SetAccessRule($AccessRule)
+                Set-Acl -path $Using:WCSJavaApplicationRootDirectory -AclObject $Acl
+            }
+        }
+    }  
 }
 
 function Get-WCSJavaApplicationRootDirectory {
