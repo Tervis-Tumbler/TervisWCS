@@ -284,6 +284,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Set-WCSProfileBat
     $Nodes | New-QCSoftwareShare
     $Nodes | Install-WCSServiceManager
+    $Nodes | Start-WCSServiceManagerService
     $Nodes | New-WCSShortcut
     $Nodes | Set-WCSBackground
 }
@@ -291,6 +292,17 @@ function Invoke-WCSJavaApplicationProvision {
 function Get-WCSJavaApplicationGitRepositoryPath {
     $ADDomain = Get-ADDomain -Current LocalComputer
     "\\$($ADDomain.DNSRoot)\applications\GitRepository\WCSJavaApplication"
+}
+
+function Start-WCSServiceManagerService {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    process {
+        Invoke-Command -ComputerName $ComputerName -ScriptBlock {
+            Start-Service -Name servicemgr
+        }
+    }
 }
 
 function Set-WCSBackground {
