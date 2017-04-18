@@ -77,6 +77,8 @@ function Add-WCSODBCDSN {
     begin {
         $ODBCDSNTemplate = Get-WCSODBCDSNTemplate -Name $ODBCDSNTemplateName
         $DSNName = $ODBCDSNTemplate.Name
+    }
+    process {
         $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
 
         $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.$($ODBCDSNTemplate.EnvironmentStatePropertyContainingPasswordID)
@@ -88,9 +90,7 @@ Integrated=NO
 Host=$($SybaseDatabaseEntryDetails.Host)
 DatabaseName=$DatabaseName
 "@ -split "`r`n"
-    }
 
-    process { 
         $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName | ConvertTo-HashTable
         $CIMSession = New-CimSession @ComputerNameParameter
        
@@ -504,19 +504,21 @@ function Remove-WCSServiceManager {
 
 function Set-WCSProfileBat {
     param (
-        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName
     )
     begin {
         $RootDirectory = Get-WCSJavaApplicationRootDirectory
-        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
+        $ProfileTemplateFile = "$(Get-WCSJavaApplicationGitRepositoryPath)\Profile.bat.pstemplate"
+    }
+    process {
+        $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.SybaseQCUserPasswordEntryID
         $Global:DATABASE_MACHINE = $SybaseDatabaseEntryDetails.Host
         $Global:DATABASE_NAME = $SybaseDatabaseEntryDetails.DatabaseName
         $Global:QCCS_DB_NAME = $SybaseDatabaseEntryDetails.DatabaseName
         $Global:DATABASE_PORT = $SybaseDatabaseEntryDetails.Port
-        $ADDomain = Get-ADDomain -Current LocalComputer
-        $ProfileTemplateFile = "\\$($ADDomain.DNSRoot)\applications\GitRepository\WCSJavaApplication\Profile.bat.pstemplate"
-    }
-    process {
+
         $RootDirectoryRemote = $RootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
         $Global:ComputerName = $ComputerName
 
