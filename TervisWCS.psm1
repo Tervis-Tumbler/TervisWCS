@@ -287,7 +287,19 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Start-WCSServiceManagerService
     $Nodes | New-WCSShortcut
     $Nodes | Set-WCSBackground
+    $Nodes | New-WCSJavaApplicationFirewallRules
 }
+
+function New-WCSJavaApplicationFirewallRules {
+    param (
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+    )
+    process {
+        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS Control" -Group WCS -LocalPort 26000 -Name "WCSControl" -Direction Inbound -Action Allow -Protocol tcp
+        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS RMI" -Group WCS -LocalPort 26300 -Name "WCSRMI" -Direction Inbound -Action Allow -Protocol tcp
+    }
+}
+
 
 function Get-WCSJavaApplicationGitRepositoryPath {
     $ADDomain = Get-ADDomain -Current LocalComputer
