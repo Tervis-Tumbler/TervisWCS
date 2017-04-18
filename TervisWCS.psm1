@@ -483,6 +483,7 @@ function Install-WCSServiceManager {
         Invoke-Command -ComputerName $ComputerName -ScriptBlock {
             Set-Location -Path $Using:RootDirectory\bin
             cmd /c "..\profile.bat && servicemgr -i"
+            Set-Service -Name servicemgr -StartupType Automatic
         }
     }
 }
