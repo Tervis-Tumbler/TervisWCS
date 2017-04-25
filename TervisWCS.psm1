@@ -281,7 +281,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Add-WCSODBCDSN -ODBCDSNTemplateName Tervis
     $Nodes | Set-WCSEnvironmentVariables
     $Nodes | Expand-QCSoftwareZipPackage
-    $Nodes | Set-WCSProfileBat
+    $Nodes | Invoke-ProcessWCSTemplateFiles
     $Nodes | New-QCSoftwareShare
     $Nodes | Install-WCSServiceManager
     $Nodes | Start-WCSServiceManagerService
@@ -292,14 +292,14 @@ function Invoke-WCSJavaApplicationProvision {
 
 function New-WCSJavaApplicationFirewallRules {
     param (
-        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
+        [Switch]$Force
     )
     process {
-        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS Control" -Group WCS -LocalPort 26000 -Name "WCSControl" -Direction Inbound -Action Allow -Protocol tcp
-        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS RMI" -Group WCS -LocalPort 26300 -Name "WCSRMI" -Direction Inbound -Action Allow -Protocol tcp
+        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS Control" -Group WCS -LocalPort 26000-26100 -Name "WCSControl" -Direction Inbound -Action Allow -Protocol tcp -Force:$Force
+        New-TervisFirewallRule -ComputerName $ComputerName -DisplayName "WCS RMI" -Group WCS -LocalPort 26300-26400 -Name "WCSRMI" -Direction Inbound -Action Allow -Protocol tcp -Force:$Force
     }
 }
-
 
 function Get-WCSJavaApplicationGitRepositoryPath {
     $ADDomain = Get-ADDomain -Current LocalComputer
@@ -550,6 +550,32 @@ function Set-WCSProfileBat {
         $ProfileTemplateFile | 
         Invoke-ProcessTemplateFile |
         Out-File -Encoding ascii -NoNewline "$RootDirectoryRemote\profile.bat"
+    }
+}
+
+function Invoke-ProcessWCSTemplateFiles {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName
+    )
+    begin {
+        $RootDirectory = Get-WCSJavaApplicationRootDirectory
+        $TemplateFilesPath = Get-WCSJavaApplicationGitRepositoryPath
+    }
+    process {
+        $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.SybaseQCUserPasswordEntryID
+        $TemplateVariables = @{
+            DATABASE_MACHINE = $SybaseDatabaseEntryDetails.Host
+            DATABASE_NAME = $SybaseDatabaseEntryDetails.DatabaseName
+            QCCS_DB_NAME = $SybaseDatabaseEntryDetails.DatabaseName
+            DATABASE_PORT = $SybaseDatabaseEntryDetails.Port
+            ComputerName = $ComputerName
+            EnvironmentName = $EnvironmentName
+        }
+
+        $RootDirectoryRemote = $RootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
+        Invoke-ProcessTemplatePath -Path $TemplateFilesPath -DestinationPath $RootDirectoryRemote -TemplateVariables $TemplateVariables
     }
 }
 
