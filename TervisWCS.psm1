@@ -23,6 +23,58 @@ order by ts DESC
     $ConveyorScaleNumberOfUniqueWeights
 }
 
+function Update-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName {
+    param (
+        [Parameter(Mandatory)]$ComputerName,
+        $OldComputerName,
+        [Parameter(Mandatory)]$PasswordID
+    )
+    $Query = @"
+update TervisContentsLabels
+set filename = replace(filename, '$OldComputerName', '$ComputerName');
+
+update TervisSalesChannelXRef
+set filename = replace(filename, '$OldComputerName', '$ComputerName');
+"@
+
+    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $PasswordID
+    $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
+
+    Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow
+}
+
+function Set-TervisWCSSystemParameterCS_Server {
+    param (
+        [Parameter(Mandatory)]$CS_Server,
+        [Parameter(Mandatory)]$PasswordID
+    )
+    $Query = @"
+update SystemParameters
+set value = '$CS_Server'
+where Name = 'CS_Server';
+"@
+
+    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $PasswordID
+    $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
+
+    Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow    
+}
+
+function Get-TervisWCSSystemParameterCS_Server {
+    param (
+        [Parameter(Mandatory)]$PasswordID
+    )
+    $Query = @"
+select name,value from SystemParameters
+where Name = 'CS_Server';
+"@
+
+    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $PasswordID
+    $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
+
+    Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow    
+}
+
 $EnvironmentState = [PSCustomObject][Ordered]@{
     EnvironmentName = "Production"
     SybaseTervisUserPasswordEntryID = 3458
@@ -288,6 +340,19 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | New-WCSShortcut
     $Nodes | Set-WCSBackground
     $Nodes | New-WCSJavaApplicationFirewallRules
+}
+
+function Set-WCSSystemParameterCS_ServerBasedOnNode {
+    param (       
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+    )
+    begin {
+        $ADDomain = Get-ADDomain
+    }
+    process {
+        $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
+        Set-TervisWCSSystemParameterCS_Server -CS_Server "Progistics.$EnvironmentName.$($ADDomain.DNSRoot)" -PasswordID $WCSEnvironmentState.SybaseQCUserPasswordEntryID
+    }
 }
 
 function New-WCSJavaApplicationFirewallRules {
