@@ -181,7 +181,7 @@ function Remove-WCSODBCDSN {
     process {
         $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName | ConvertTo-HashTable
         $CIMSession = New-CimSession @ComputerNameParameter       
-        Remove-OdbcDsn -Name tervis -Platform All -CimSession $CIMSession -DsnType All -ErrorAction SilentlyContinue
+        Remove-OdbcDsn -Name $DSNName -Platform All -CimSession $CIMSession -DsnType All -ErrorAction SilentlyContinue
     }
 }
 
@@ -349,6 +349,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | Set-WCSBackground
     $Nodes | New-WCSJavaApplicationFirewallRules
     $Nodes | Install-WCSPrinters -PrintEngineOrientationRelativeToLabel Top
+    $Nodes | Install-WCSPrinters -PrintEngineOrientationRelativeToLabel Bottom
 }
 
 function Set-WCSSystemParameterCS_ServerBasedOnNode {
