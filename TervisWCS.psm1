@@ -203,7 +203,7 @@ function Update-WCSODBCDSN {
 function Get-WCSEquipment {
     param (
         [Parameter(Mandatory)]$EnvironmentName,
-        [ValidateSet("Top","Bottom")]$PrintEngineOrientation
+        [ValidateSet("Top","Bottom")]$PrintEngineOrientationRelativeToLabel
     )
     $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
     $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.SybaseQCUserPasswordEntryID
@@ -214,11 +214,11 @@ SELECT * FROM "qc"."Equipment"
 "@
     $WCSEquipment = Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow
 
-    if ($PrintEngineOrientation -eq "Top") {
+    if ($PrintEngineOrientationRelativeToLabel -eq "Top") {
         $WCSEquipment |
         where id -Match Shipping |
         where id -NotMatch _PL
-    } elseif ($PrintEngineOrientation -eq "Bottom") {
+    } elseif ($PrintEngineOrientationRelativeToLabel -eq "Bottom") {
         $WCSEquipment |
         where id -Match _PL
     } else {
@@ -249,19 +249,19 @@ function Install-WCSPrinters {
     param (
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
         [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName,
-        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientation
+        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientationRelativeToLabel
     )
     process {
         Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate -ComputerName $ComputerName
         Add-PrinterDriver -Name "ZDesigner 110Xi4 203 dpi" -ComputerName $ComputerName
 
         if (-not (Test-WCSPrintersInstalled @PSBoundParameters)) {
-            Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientation $PrintEngineOrientation |
+            Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientationRelativeToLabel $PrintEngineOrientationRelativeToLabel |
             Add-LocalWCSPrinter -ComputerName $ComputerName
         }
 
         if (-not (Test-WCSPrintersInstalled @PSBoundParameters)) {
-            Throw "Couldn't install some printers or ports. To identify the missing  run Test-WCSPrintersInstalled -Verbose -ComputerName $ComputerName -PrintEngineOrientation $PrintEngineOrientation -EnvironmentName $EnvironmentName"
+            Throw "Couldn't install some printers or ports. To identify the missing  run Test-WCSPrintersInstalled -Verbose -ComputerName $ComputerName -PrintEngineOrientationRelativeToLabel $PrintEngineOrientationRelativeToLabel -EnvironmentName $EnvironmentName"
         }
     }
 }
@@ -271,9 +271,9 @@ function Test-WCSPrintersInstalled {
     param (
         [Parameter(Mandatory)]$ComputerName,
         [Parameter(Mandatory)]$EnvironmentName,
-        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientation
+        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientationRelativeToLabel
     )
-    $Equipment = Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientation $PrintEngineOrientation
+    $Equipment = Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientationRelativeToLabel $PrintEngineOrientationRelativeToLabel
     $PrinterPorts = Get-PrinterPort -ComputerName $ComputerName
     $Printers = Get-Printer -ComputerName $ComputerName
 
@@ -348,7 +348,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | New-WCSShortcut
     $Nodes | Set-WCSBackground
     $Nodes | New-WCSJavaApplicationFirewallRules
-    $Nodes | Install-WCSPrinters -PrintEngineOrientation Top
+    $Nodes | Install-WCSPrinters -PrintEngineOrientationRelativeToLabel Top
 }
 
 function Set-WCSSystemParameterCS_ServerBasedOnNode {
