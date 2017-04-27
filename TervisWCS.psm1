@@ -201,18 +201,29 @@ function Update-WCSODBCDSN {
 }
 
 function Get-WCSEquipment {
-    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID 3459
+    param (
+        [Parameter(Mandatory)]$EnvironmentName,
+        [ValidateSet("Top","Bottom")]$PrintEngineOrientation
+    )
+    $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
+    $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.SybaseQCUserPasswordEntryID
     $ConnectionString = $SybaseDatabaseEntryDetails | ConvertTo-SQLAnywhereConnectionString
 
     $Query = @"
 SELECT * FROM "qc"."Equipment"
 "@
-    Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow
-}
+    $WCSEquipment = Invoke-SQLAnywhereSQL -ConnectionString $ConnectionString -SQLCommand $Query -DatabaseEngineClassMapName SQLAnywhere -ConvertFromDataRow
 
-function Get-WCSEquipmentBottomLabelPrintEngine {
-    Get-WCSEquipment |
-    where id -Match _PL
+    if ($PrintEngineOrientation -eq "Top") {
+        $WCSEquipment |
+        where id -Match Shipping |
+        where id -NotMatch _PL
+    } elseif ($PrintEngineOrientation -eq "Bottom") {
+        $WCSEquipment |
+        where id -Match _PL
+    } else {
+        $WCSEquipment
+    }
 }
 
 function Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate {
@@ -234,35 +245,37 @@ function Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate {
     } @PSBoundParameters
 }
 
-function Install-WCSPrintersForBartenderCommander {
+function Install-WCSPrinters {
     param (
-        [Parameter(ValueFromPipelineByPropertyName)]$ComputerName
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName,
+        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientation
     )
-    $Parameters = $PSBoundParameters
+    process {
+        Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate -ComputerName $ComputerName
+        Add-PrinterDriver -Name "ZDesigner 110Xi4 203 dpi" -ComputerName $ComputerName
 
-    Install-ZDesignerDriverForWindows10AndLaterFromWindowsUpdate @Parameters
-    Add-PrinterDriver -Name "ZDesigner 110Xi4 203 dpi" @Parameters    
+        if (-not (Test-WCSPrintersInstalled @PSBoundParameters)) {
+            Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientation $PrintEngineOrientation |
+            Add-LocalWCSPrinter -ComputerName $ComputerName
+        }
 
-    if (-not (Test-WCSPrintersForBartenderCommanderInstalled @Parameters)) {
-        Get-WCSEquipmentBottomLabelPrintEngine |
-        Add-LocalWCSPrinter @Parameters
-    }
-
-    if (-not (Test-WCSPrintersForBartenderCommanderInstalled @Parameters)) {
-        Throw "Couldn't install some printers or ports. To identify the missing  run Test-WCSPrintersForBartenderCommanderInstalled -verbose $ComputerName"
+        if (-not (Test-WCSPrintersInstalled @PSBoundParameters)) {
+            Throw "Couldn't install some printers or ports. To identify the missing  run Test-WCSPrintersInstalled -Verbose -ComputerName $ComputerName -PrintEngineOrientation $PrintEngineOrientation -EnvironmentName $EnvironmentName"
+        }
     }
 }
 
-function Test-WCSPrintersForBartenderCommanderInstalled {
+function Test-WCSPrintersInstalled {
     [CMDLetBinding()]
     param (
-        $ComputerName
+        [Parameter(Mandatory)]$ComputerName,
+        [Parameter(Mandatory)]$EnvironmentName,
+        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientation
     )
-    $Parameters = $PSBoundParameters
-
-    $Equipment = Get-WCSEquipmentBottomLabelPrintEngine
-    $PrinterPorts = Get-PrinterPort @Parameters
-    $Printers = Get-Printer @Parameters
+    $Equipment = Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientation $PrintEngineOrientation
+    $PrinterPorts = Get-PrinterPort -ComputerName $ComputerName
+    $Printers = Get-Printer -ComputerName $ComputerName
 
     $MissingPorts = Compare-Object -ReferenceObject ($Equipment.HostID | sort -Unique) -DifferenceObject $PrinterPorts.Name | 
     where SideIndicator -EQ "<="
@@ -281,11 +294,6 @@ function Add-LocalWCSPrinter {
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]$HostID,
         $ComputerName
     )
-    begin {
-        $ComputerNameParameter = $PSBoundParameters | 
-        ConvertFrom-PSBoundParameters | 
-        where ComputerName
-    }
     process {
         if ($ComputerName) {
             Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ComputerName $ComputerName -ErrorAction SilentlyContinue
@@ -340,6 +348,7 @@ function Invoke-WCSJavaApplicationProvision {
     $Nodes | New-WCSShortcut
     $Nodes | Set-WCSBackground
     $Nodes | New-WCSJavaApplicationFirewallRules
+    $Nodes | Install-WCSPrinters -PrintEngineOrientation Top
 }
 
 function Set-WCSSystemParameterCS_ServerBasedOnNode {
@@ -658,5 +667,19 @@ function ConvertFrom-StringUsingRegexCaptureGroup {
             Add-Member -MemberType NoteProperty -Name $GroupName -Value $Match.Groups[$GroupName].Value 
         }
         $Object
+    }
+}
+
+function Get-WCSLogFileTail {
+    param (
+        $ComputerName,
+        $Tail = 100
+    )
+    $WCSJavaApplicationRootDirectoryRemote = Get-WCSJavaApplicationRootDirectory | ConvertTo-RemotePath -ComputerName $ComputerName
+    $LogFilePath = "$WCSJavaApplicationRootDirectoryRemote\log\tmp"
+    $LogFiles = Get-ChildItem -Path $LogFilePath -File | where name -NotMatch ".lnk"
+    $LogFiles | ForEach-Object { 
+        $_.FullName
+        Get-Content -Tail $Tail -Path $_.FullName 
     }
 }
