@@ -635,7 +635,7 @@ function Invoke-ProcessWCSTemplateFiles {
     )
     begin {
         $RootDirectory = Get-WCSJavaApplicationRootDirectory
-        $TemplateFilesPath = Get-WCSJavaApplicationGitRepositoryPath
+        $TemplateFilesPath = "$(Get-WCSJavaApplicationGitRepositoryPath)\QcSoftware"
     }
     process {
         $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
