@@ -240,3 +240,32 @@ function Invoke-TervisShippingComputersFlushDNS {
         }
     }
 }
+
+function Invoke-GPUpdateOnAllShipStations {
+    $Computers = Get-ADComputer -Filter {name -like "ship*"} | select -ExpandProperty Name
+#    Start-ParallelWork -Parameters $Computers -ScriptBlock {
+#        Invoke-Command -ComputerName $Parameter -ScriptBlock {
+#            gpupdate
+#            $env:COMPUTERNAME
+#        }
+#    }
+    foreach ($Computer in $Computers) {        
+        Invoke-Command -ComputerName $Computer -ScriptBlock {
+            gpupdate
+            $env:COMPUTERNAME
+        }
+    }
+}
+
+function Test-WCSShortcutLink {
+    $Computers = Get-ADComputer -Filter {name -like "ship*"} | select -ExpandProperty Name
+    $LocalPath = "C:\users\Public\Desktop\WCS (PRD-WCSApp01).lnk"
+        foreach ($Computer in $Computers) {        
+            $Result = Test-Path -Path ($LocalPath | ConvertTo-RemotePath -ComputerName $Computer)
+            [PSCustomObject][Ordered]@{
+                ComputerName = $Computer
+                ShortcutExists = $Result
+            }
+        }
+}
+
