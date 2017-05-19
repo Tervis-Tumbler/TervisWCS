@@ -269,3 +269,16 @@ function Test-WCSShortcutLink {
         }
 }
 
+function Invoke-PostWCSSybaseDatabaseRefresh {    
+    Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Delta
+    Update-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -ComputerName dlt-wcssyabse -OldComputerName WCS01 -PasswordID 4115
+    Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Epsilon
+    Update-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -ComputerName eps-wcssyabse -OldComputerName WCS01 -PasswordID 4116
+}
+
+function Get-PostWCSSybaseDatabaseRefreshChanges {
+    Get-TervisWCSSystemParameterCS_Server -PasswordID 4115
+    Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -PasswordID 4115
+    Get-TervisWCSSystemParameterCS_Server -PasswordID 4116
+    Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -PasswordID 4116
+}
