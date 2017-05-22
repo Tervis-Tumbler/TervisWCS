@@ -278,6 +278,7 @@ function Invoke-PostWCSSybaseDatabaseRefreshSybaseSteps {
 }
 
 
+function Invoke-PostWCSSybaseDatabaseRefresh {
     $Nodes = Get-TervisClusterApplicationNode -ClusterApplicationName Progistics -EnvironmentName Delta, Epsilon
     $Nodes | Set-ProgisticsMSNToHigherThanWCSSybaseConnectShipMSNPreviouslyUsed
 
