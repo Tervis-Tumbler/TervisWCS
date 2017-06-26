@@ -271,10 +271,10 @@ function Test-WCSShortcutLink {
 
 function Invoke-PostWCSSybaseDatabaseRefreshSybaseSteps {    
     Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Delta
-    Update-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -ComputerName dlt-wcssyabse -OldComputerName WCS01 -PasswordID 4115
+    Update-TervisWCSReferencesToComputerName -ComputerName WCSJavaApplication.Delta.Tervis.prv -OldComputerName WCS01 -PasswordID 4115
     
     Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Epsilon
-    Update-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -ComputerName eps-wcssyabse -OldComputerName WCS01 -PasswordID 4116
+    Update-TervisWCSReferencesToComputerName -ComputerName WCSJavaApplication.Epsilon.Tervis.prv -OldComputerName WCS01 -PasswordID 4116
 }
 
 
