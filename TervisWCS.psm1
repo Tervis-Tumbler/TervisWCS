@@ -182,7 +182,7 @@ function Test-WCSPrintersInstalled {
     where SideIndicator -EQ "<="
     $MissingPrinters | Write-VerboseAdvanced -Verbose:($VerbosePreference -ne "SilentlyContinue")
 
-    -not $MissingPorts -or -not $MissingPrinters
+    -not $MissingPorts -and -not $MissingPrinters
 }
 
 function Add-LocalWCSPrinter {
