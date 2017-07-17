@@ -269,12 +269,24 @@ function Test-WCSShortcutLink {
         }
 }
 
+function Resolve-WCSCnameToHostname {
+    param (
+        [Parameter(Mandatory)]$Name
+    )
+    $Response = Resolve-DnsName -Name $Name -Type CNAME
+    $Response.NameHost -replace ".tervis.prv", ""
+}
+
 function Invoke-PostWCSSybaseDatabaseRefreshSybaseSteps {    
+    $OldComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Production.Tervis.prv
+
     Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Delta
-    Update-TervisWCSReferencesToComputerName -ComputerName WCSJavaApplication.Delta.Tervis.prv -OldComputerName WCS01 -PasswordID 4115
+    $ComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Delta.Tervis.prv
+    Update-TervisWCSReferencesToComputerName -ComputerName $ComputerName -OldComputerName $OldComputerName -PasswordID 4115
     
     Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Epsilon
-    Update-TervisWCSReferencesToComputerName -ComputerName WCSJavaApplication.Epsilon.Tervis.prv -OldComputerName WCS01 -PasswordID 4116
+    $ComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Epsilon.Tervis.prv
+    Update-TervisWCSReferencesToComputerName -ComputerName $ComputerName -OldComputerName $OldComputerName -PasswordID 4116
 }
 
 
