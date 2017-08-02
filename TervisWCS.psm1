@@ -163,6 +163,18 @@ function Install-WCSPrinters {
     }
 }
 
+function Update-WCSPrinters {
+    param (
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$ComputerName,
+        [Parameter(Mandatory,ValueFromPipelineByPropertyName)]$EnvironmentName,
+        [Parameter(Mandatory)][ValidateSet("Top","Bottom")]$PrintEngineOrientationRelativeToLabel
+    )
+    process {
+        Get-WCSEquipment -EnvironmentName $EnvironmentName -PrintEngineOrientationRelativeToLabel $PrintEngineOrientationRelativeToLabel |
+        Add-LocalWCSPrinter -ComputerName $ComputerName -Force
+    }
+}
+
 function Test-WCSPrintersInstalled {
     [CMDLetBinding()]
     param (
@@ -189,13 +201,22 @@ function Add-LocalWCSPrinter {
     param(
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]$ID,
         [Parameter(Mandatory, ValueFromPipelineByPropertyName)]$HostID,
-        $ComputerName
+        $ComputerName,
+        [Switch]$Force
     )
     process {
         if ($ComputerName) {
+            if ($Force) {
+                Remove-Printer -Name $ID -ComputerName $ComputerName -ErrorAction SilentlyContinue
+                Remove-PrinterPort -Name $HostID -ComputerName $ComputerName -ErrorAction SilentlyContinue
+            }
             Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ComputerName $ComputerName -ErrorAction SilentlyContinue
             Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi" -ComputerName $ComputerName -ErrorAction SilentlyContinue
         } else {
+            if ($Force) {
+                Remove-Printer -Name $ID -ErrorAction SilentlyContinue
+                Remove-PrinterPort -Name $HostID -ErrorAction SilentlyContinue
+            }
             Add-PrinterPort -Name $HostID -PrinterHostAddress $HostID -ErrorAction SilentlyContinue
             Add-Printer -PortName $HostID -Name $ID -DriverName "ZDesigner 110Xi4 203 dpi" -ErrorAction SilentlyContinue
         }
