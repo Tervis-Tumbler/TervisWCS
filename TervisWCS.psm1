@@ -47,7 +47,8 @@ function Add-WCSODBCDSN {
         $ODBCDSNTemplateName,
 
         [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
-        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName,
+        $DriverName = "SQL Anywhere 12"
     )
     begin {
         $ODBCDSNTemplate = Get-WCSODBCDSNTemplate -Name $ODBCDSNTemplateName
@@ -72,7 +73,7 @@ DatabaseName=$DatabaseName
         $ODBCDSN32Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '32-bit' -Name $DSNName -ErrorAction SilentlyContinue
         if (-not $ODBCDSN32Bit) {
             Invoke-Command @ComputerNameParameter -ScriptBlock {
-                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform '32-bit' -DsnType System
+                Add-OdbcDsn -Name $Using:DSNName -DriverName $Using:DriverName -SetPropertyValue $Using:PropertyValue -Platform '32-bit' -DsnType System
                 New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name UID -Value $Using:SybaseDatabaseEntryDetails.UserName | Out-Null
                 New-ItemProperty -Path HKLM:\SOFTWARE\WOW6432Node\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name PWD -Value $Using:SybaseDatabaseEntryDetails.Password | Out-Null
             }
@@ -81,7 +82,7 @@ DatabaseName=$DatabaseName
         $ODBCDSN64Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '64-bit' -Name $DSNName -ErrorAction SilentlyContinue
         if (-not $ODBCDSN64Bit) {
             Invoke-Command @ComputerNameParameter -ScriptBlock {
-                Add-OdbcDsn -Name $Using:DSNName -DriverName "SQL Anywhere 12" -SetPropertyValue $Using:PropertyValue -Platform '64-bit' -DsnType System
+                Add-OdbcDsn -Name $Using:DSNName -DriverName $Using:DriverName -SetPropertyValue $Using:PropertyValue -Platform '64-bit' -DsnType System
                 New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name UID -Value $Using:SybaseDatabaseEntryDetails.UserName | Out-Null
                 New-ItemProperty -Path HKLM:\SOFTWARE\ODBC\ODBC.INI\$Using:DSNName -PropertyType String -Name PWD -Value $Using:SybaseDatabaseEntryDetails.Password | Out-Null
             }
@@ -115,11 +116,12 @@ function Update-WCSODBCDSN {
         $ODBCDSNTemplateName,
 
         [Parameter(ValueFromPipelineByPropertyName)]$ComputerName,
-        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName
+        [Parameter(ValueFromPipelineByPropertyName)]$EnvironmentName,
+        $DriverName = "SQL Anywhere 12"
     )
     process {
         Remove-WCSODBCDSN -ODBCDSNTemplateName $ODBCDSNTemplateName -ComputerName $ComputerName
-        Add-WCSODBCDSN -ODBCDSNTemplateName $ODBCDSNTemplateName -ComputerName $ComputerName -EnvironmentName $EnvironmentName
+        Add-WCSODBCDSN -ODBCDSNTemplateName $ODBCDSNTemplateName -ComputerName $ComputerName -EnvironmentName $EnvironmentName -DriverName $DriverName
     }
 }
 
