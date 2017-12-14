@@ -326,3 +326,22 @@ function Get-PostWCSSybaseDatabaseRefreshChanges {
     Get-TervisWCSSystemParameterCS_Server -PasswordID 4116
     Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -PasswordID 4116
 }
+
+function Set-ShipStationTwinPrint {
+    param (
+        $TopPrintEngine,
+        $BottomPrintEngine,
+        $ShipStationNumber
+    )
+    Read-Host "Update printers in WCS java application"
+    $WCSEquipment = Get-WCSEquipment -EnvironmentName Production
+
+    $WCSEquipment | Where-Object { $_.ID -eq "Shipping$ShipStationNumber" -or $_.ID -eq "Shipping_PL$ShipStationNumber" }
+    
+    Update-WCSPrinters -ComputerName wcsjavaapplication.production.tervis.prv -EnvironmentName Production -PrintEngineOrientationRelativeToLabel Top
+    Update-WCSPrinters -ComputerName wcsjavaapplication.production.tervis.prv -EnvironmentName Production -PrintEngineOrientationRelativeToLabel Bottom
+    Update-WCSPrinters -ComputerName BartenderCommander.production.tervis.prv -EnvironmentName Production -PrintEngineOrientationRelativeToLabel Top
+    Update-WCSPrinters -ComputerName BartenderCommander.production.tervis.prv -EnvironmentName Production -PrintEngineOrientationRelativeToLabel Bottom
+
+    Read-Host "Restart labelmgrship and labelmgrpack system processes within WCS"
+}
