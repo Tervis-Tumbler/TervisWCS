@@ -345,3 +345,29 @@ function Set-ShipStationTwinPrint {
 
     Read-Host "Restart labelmgrship and labelmgrpack system processes within WCS"
 }
+
+function Restart-WCSSystemServers {
+    Send-TervisMailMessage -To WCSIssues@tervis.com -Subject "WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
+Team,
+
+PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 are currently being rebooted.
+
+Thanks,
+
+IT
+"@
+    Start-ParallelWork -Parameters "PRD-WCSApp01","PRD-Bartender01","PRD-Progis01" -ScriptBlock {
+        param($ComputerName)
+        Restart-Computer -Wait -ComputerName $ComputerName -Force
+    } 
+
+    Send-TervisMailMessage -To WCSIssues@tervis.com -Subject "RE: WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
+Team,
+
+The reboot of PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 has completed.
+
+Thanks,
+
+IT
+"@
+}
