@@ -347,7 +347,7 @@ function Set-ShipStationTwinPrint {
 }
 
 function Restart-WCSSystemServers {
-    Send-TervisMailMessage -To WCSIssues@tervis.com -Subject "WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
+    Send-TervisMailMessage -To ShippingIssues@tervis.com -Subject "WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
 Team,
 
 PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 are currently being rebooted.
@@ -361,7 +361,7 @@ IT
         Restart-Computer -Wait -ComputerName $ComputerName -Force
     } 
 
-    Send-TervisMailMessage -To WCSIssues@tervis.com -Subject "RE: WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
+    Send-TervisMailMessage -To ShippingIssues@tervis.com -Subject "RE: WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
 Team,
 
 The reboot of PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 has completed.
@@ -370,4 +370,24 @@ Thanks,
 
 IT
 "@
+}
+
+function Install-TervisWCSSystemScheduledReboot {
+    New-ADServiceAccount -
+    $Nodes = Get-WCSSystemNodes -EnvironmentName Production
+    $WCSSystemADComputers = $Nodes.ComputerName | Get-ADComputer
+    $ADDomain = Get-ADDomain
+    $GroupManagedServiceAccountName = "PRD-WCSSystem"
+
+    New-ADServiceAccount -Name $GroupManagedServiceAccountName -DNSHostName "$GroupManagedServiceAccountName$($ADDomain.DNSRoot)"-PrincipalsAllowedToRetrieveManagedPassword $WCSSystemADComputers
+    Test-ADServiceAccount -Identity $GroupManagedServiceAccountName
+
+    Install-PowerShellApplicationScheduledTask -FunctionName Restart-WCSSystemServers -RepetitionIntervalName EveryDayAt7am3pm11pm
+}
+
+function Get-WCSSystemNodes {
+    param (
+        [String]$EnvironmentName
+    )
+    Get-TervisApplicationNode -ApplicationName Progistics,WCSJavaApplication,BartenderCommander -EnvironmentName $EnvironmentName
 }
