@@ -391,3 +391,17 @@ function Get-WCSSystemNodes {
     )
     Get-TervisApplicationNode -ApplicationName Progistics,WCSJavaApplication,BartenderCommander -EnvironmentName $EnvironmentName
 }
+
+function Get-FedexSMCorruptedDataDownloads {
+    param(
+        [parameter(Mandatory)]$Computername
+    )
+    Get-ChildItem -Path "\\$Computername\C$\FedEx\FedEx_Comm\SasvDataDnld\*jar.jar*"
+}
+
+function Get-FedexSMHourlyUploads {
+    param(
+        [parameter(Mandatory)]$Computername
+    )
+    Get-ChildItem -Path "\\$Computername\C$\FedEx\FedEx_Admn\hourlyupload\*.HUP"
+}
