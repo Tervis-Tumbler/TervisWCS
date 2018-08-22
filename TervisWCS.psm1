@@ -1,20 +1,20 @@
 $EnvironmentState = [PSCustomObject][Ordered]@{
     EnvironmentName = "Production"
-    SybaseTervisUserPasswordEntryID = 3458
-    SybaseQCUserPasswordEntryID = 3459
-    SybaseBartenderUserPasswordEntryID = 3718
+    SybaseTervisUserPasswordEntryGUID = "185d9c8a-531f-4fe4-9b82-b4cca1e8847f"
+    SybaseQCUserPasswordEntryGUID = "6ef84c66-8e50-4e0e-92db-50eae27f8406"
+    SybaseBartenderUserPasswordEntryGUID = "8f277385-c577-4dfc-94a4-eb16f1207283"
 },
 [PSCustomObject][Ordered]@{
     EnvironmentName = "Epsilon"
-    SybaseTervisUserPasswordEntryID = 3457
-    SybaseQCUserPasswordEntryID = 4116
-    SybaseBartenderUserPasswordEntryID = 4118
+    SybaseTervisUserPasswordEntryGUID = "79f70a7f-3317-4c67-af1c-02585c4be99e"
+    SybaseQCUserPasswordEntryGUID = "0f817323-3c0a-48bc-bdce-b12a32bf9bf7"
+    SybaseBartenderUserPasswordEntryGUID = "dd0e83b8-823a-4446-b1b3-80686acab03c"
 },
 [PSCustomObject][Ordered]@{
     EnvironmentName = "Delta"
-    SybaseTervisUserPasswordEntryID = 3456
-    SybaseQCUserPasswordEntryID = 4115
-    SybaseBartenderUserPasswordEntryID = 4117
+    SybaseTervisUserPasswordEntryGUID = "1e99e5b0-35ad-4d3e-8c77-e65d17529c69"
+    SybaseQCUserPasswordEntryGUID = "bbbd810f-78e1-427f-a0a6-30982e93639b"
+    SybaseBartenderUserPasswordEntryGUID = "b66b273d-dd3d-40a3-9c38-317ae434ed48"
 }
 
 function Get-WCSEnvironmentState {
@@ -26,11 +26,11 @@ function Get-WCSEnvironmentState {
 
 $WCSDSNTemplate = [PSCustomObject][Ordered]@{
     Name = "Tervis"
-    EnvironmentStatePropertyContainingPasswordID = "SybaseTervisUserPasswordEntryID"
+    EnvironmentStatePropertyContainingPasswordGUID = "SybaseTervisUserPasswordEntryGUID"
 },
 [PSCustomObject][Ordered]@{
     Name = "tervisBartender"
-    EnvironmentStatePropertyContainingPasswordID = "SybaseBartenderUserPasswordEntryID"
+    EnvironmentStatePropertyContainingPasswordGUID = "SybaseBartenderUserPasswordEntryGUID"
 }
 
 function Get-WCSODBCDSNTemplate {
@@ -57,7 +57,7 @@ function Add-WCSODBCDSN {
     process {
         $WCSEnvironmentState = Get-WCSEnvironmentState -EnvironmentName $EnvironmentName
 
-        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -PasswordID $WCSEnvironmentState.$($ODBCDSNTemplate.EnvironmentStatePropertyContainingPasswordID)
+        $SybaseDatabaseEntryDetails = Get-PasswordstateSybaseDatabaseEntryDetails -GUID $WCSEnvironmentState.$($ODBCDSNTemplate.EnvironmentStatePropertyContainingPasswordGUID)
         $DatabaseName = $SybaseDatabaseEntryDetails.DatabaseName
 
         $PropertyValue = @"
@@ -67,7 +67,7 @@ Host=$($SybaseDatabaseEntryDetails.Host)
 DatabaseName=$DatabaseName
 "@ -split "`r`n"
 
-        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters | Select ComputerName | ConvertTo-HashTable
+        $ComputerNameParameter = $PSBoundParameters | ConvertFrom-PSBoundParameters -Property ComputerName -AsHashTable
         $CIMSession = New-CimSession @ComputerNameParameter
        
         $ODBCDSN32Bit = Get-OdbcDsn -CimSession $CIMSession -Platform '32-bit' -Name $DSNName -ErrorAction SilentlyContinue
@@ -303,13 +303,11 @@ function Resolve-WCSCnameToHostname {
 function Invoke-PostWCSSybaseDatabaseRefreshSybaseSteps {    
     $OldComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Production.Tervis.prv
 
-    Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Delta
-    $ComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Delta.Tervis.prv
-    Update-TervisWCSReferencesToComputerName -ComputerName $ComputerName -OldComputerName $OldComputerName -PasswordID 4115
-    
-    Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName Epsilon
-    $ComputerName = Resolve-WCSCnameToHostname -Name WCSJavaApplication.Epsilon.Tervis.prv
-    Update-TervisWCSReferencesToComputerName -ComputerName $ComputerName -OldComputerName $OldComputerName -PasswordID 4116
+    foreach ($EnvironmentName in "Delta","Epsilon") {
+        Set-WCSSystemParameterCS_ServerBasedOnNode -EnvironmentName $EnvironmentName
+        $ComputerName = Resolve-WCSCnameToHostname -Name "WCSJavaApplication.$EnvironmentName.Tervis.prv"
+        Update-TervisWCSReferencesToComputerName -ComputerName $ComputerName -OldComputerName $OldComputerName -EnvironmentName $EnvironmentName    
+    }
 }
 
 
@@ -321,10 +319,10 @@ function Invoke-PostWCSSybaseDatabaseRefresh {
 }
 
 function Get-PostWCSSybaseDatabaseRefreshChanges {
-    Get-TervisWCSSystemParameterCS_Server -PasswordID 4115
-    Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -PasswordID 4115
-    Get-TervisWCSSystemParameterCS_Server -PasswordID 4116
-    Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -PasswordID 4116
+    foreach ($EnvironmentName in "Delta","Epsilon") {
+        Get-TervisWCSSystemParameterCS_Server -EnvironmentName $EnvironmentName
+        Get-TervisWCSTervisContentsLabelsAndTervisSalesChannelXRefFileName -EnvironmentName $EnvironmentName
+    }
 }
 
 function Set-ShipStationTwinPrint {
