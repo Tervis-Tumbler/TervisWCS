@@ -345,15 +345,24 @@ function Set-ShipStationTwinPrint {
 }
 
 function Restart-WCSSystemServers {
+    param (
+        [switch]$IncludeSybaseServer
+    )
+
     Send-TervisMailMessage -To ShippingIssues@tervis.com -Subject "WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
 Team,
 
-PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 are currently being rebooted.
+$(if ($IncludeSybaseServer){"P-WCS, "})PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 are currently being rebooted.
 
 Thanks,
 
 IT
 "@
+    if ($IncludeSybaseServer) {
+        Restart-Computer -ComputerName "P-WCS" -Wait -Force
+        Write-Warning "The Sybase server has been restarted. Please check SOA processes to make sure they are still running."
+    }
+
     Start-ParallelWork -Parameters "PRD-WCSApp01","PRD-Bartender01","PRD-Progis01" -ScriptBlock {
         param($ComputerName)
         Restart-Computer -Wait -ComputerName $ComputerName -Force
@@ -362,7 +371,7 @@ IT
     Send-TervisMailMessage -To ShippingIssues@tervis.com -Subject "RE: WCS System Rebooting" -From HelpDeskTeam@tervis.com -Body @"
 Team,
 
-The reboot of PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 has completed.
+The reboot of $(if ($IncludeSybaseServer){"P-WCS, "})PRD-WCSApp01, PRD-Bartender01, and PRD-Progis01 has completed.
 
 Thanks,
 
