@@ -360,6 +360,7 @@ IT
 "@
     if ($IncludeSybaseServer) {
         Restart-Computer -ComputerName "P-WCS" -Wait -Force
+        Wait-ForPortAvailable -ComputerName "P-WCS" -PortNumbertoMonitor 50000 
         Write-Warning "The Sybase server has been restarted. Please check SOA processes to make sure they are still running."
     }
 
